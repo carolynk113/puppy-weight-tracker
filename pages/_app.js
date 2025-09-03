@@ -4,7 +4,7 @@ import Head from "next/head";
 import { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Supabase client for magic-link session exchange
+// Supabase client (for magic-link session)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -15,21 +15,43 @@ const LOGO_URL =
   "https://mybbpohhluctmqvfsdfz.supabase.co/storage/v1/object/public/logo/companion%20dog%20project%20(2).svg";
 
 export default function MyApp({ Component, pageProps }) {
-  // Exchange ?code= from the magic link for a session (no UI changes)
+  // Handle BOTH magic-link styles:
+  // 1) modern: ?code=...  -> exchangeCodeForSession
+  // 2) legacy: #access_token=...&refresh_token=... -> setSession
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
-    const code = url.searchParams.get("code");
-    const errorDesc = url.searchParams.get("error_description");
-    if (errorDesc) alert(decodeURIComponent(errorDesc));
-    if (!code) return;
 
-    (async () => {
-      const { error } = await supabase.auth.exchangeCodeForSession({ code });
-      if (error) { alert(error.message); return; }
-      // Clean up the URL and land on /app
-      window.history.replaceState({}, "", "/app");
-    })();
+    const maybeFinishAuth = async () => {
+      // A) New flow (?code=)
+      const code = url.searchParams.get("code");
+      const errorDesc = url.searchParams.get("error_description");
+      if (errorDesc) alert(decodeURIComponent(errorDesc));
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession({ code });
+        if (error) { alert(error.message); return; }
+        // Clean URL and land on /app
+        window.history.replaceState({}, "", "/app");
+        return;
+      }
+
+      // B) Old flow (#access_token & #refresh_token in hash)
+      if (window.location.hash && window.location.hash.includes("access_token")) {
+        const params = new URLSearchParams(window.location.hash.slice(1)); // drop leading '#'
+        const access_token = params.get("access_token");
+        const refresh_token = params.get("refresh_token");
+        const error_description = params.get("error_description");
+        if (error_description) alert(decodeURIComponent(error_description));
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (error) { alert(error.message); return; }
+          // Clean URL and land on /app
+          window.history.replaceState({}, "", "/app");
+        }
+      }
+    };
+
+    maybeFinishAuth();
   }, []);
 
   return (
@@ -126,7 +148,7 @@ export default function MyApp({ Component, pageProps }) {
           padding: 0 20px;
         }
 
-        /* FORCE ALL BUTTONS PURPLE (unchanged from your file) */
+        /* FORCE ALL BUTTONS PURPLE (kept exactly as your version) */
         button,
         .btn,
         .btn.primary,
