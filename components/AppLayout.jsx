@@ -23,10 +23,16 @@ export default function AppLayout({ children }) {
     })();
   }, []);
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/"; // back to pre-login screen
+  };
+
   return (
     <div className="app-shell">
       <header className="site-header">
         <div className="logo-box">
+          {/* ensure your logo exists at /public/logo.svg */}
           <img src="/logo.svg" alt="Companion Dog Project" />
         </div>
         <h1 className="site-title">
@@ -34,16 +40,20 @@ export default function AppLayout({ children }) {
           <span className="dot"> • </span>
           <span className="app">Puppy Weight Tracker</span>
         </h1>
+        <div className="spacer" />
         <div className="signed">
           {displayName ? `Signed in as ${displayName}` : "You’re signed in"}
         </div>
+        <button className="btn ghost" onClick={signOut} style={{ marginLeft: 8 }}>
+          Sign out
+        </button>
       </header>
 
       <main className="site-main">{children}</main>
 
       <style jsx global>{`
         :root{
-          /* UI colors (not puppy collar choices) */
+          /* UI palette you asked for */
           --sage:#9DB89D;
           --lemon:#F2E9A6;
           --purple:#5E4B8A;
@@ -57,28 +67,26 @@ export default function AppLayout({ children }) {
         .app-shell{min-height:100%; display:flex; flex-direction:column;}
         .site-header{
           display:flex; align-items:center; gap:16px;
-          padding:16px 20px; border-bottom:1px solid var(--line); background:var(--card);
+          padding:14px 18px; border-bottom:1px solid var(--line); background:var(--card);
         }
         .logo-box{
-          width:80px; height:80px; border:1px solid var(--line); border-radius:14px;
+          width:96px; height:96px; border:1px solid var(--line); border-radius:14px;
           background:#fff; overflow:hidden; display:grid; place-items:center;
         }
         .logo-box img{width:100%; height:100%; object-fit:contain;}
-        .site-title{margin:0; font-size:22px; font-weight:800; color:var(--ink);}
-        .cdp{color:var(--ink)}
-        .app{color:var(--purple)}
-        .signed{margin-left:auto; opacity:.85; font-size:14px}
+        .site-title{margin:0; font-size:22px; font-weight:800;}
+        .cdp{color:var(--ink)} .app{color:var(--purple)} .spacer{flex:1}
+        .signed{opacity:.85; font-size:14px; margin-right:8px}
         .site-main{max-width:980px; width:100%; margin:20px auto; padding:0 20px;}
-
-        /* Shared UI pieces */
         .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px;}
-        .btn{padding:12px 14px; border-radius:12px; border:1px solid var(--purple); background:var(--purple); color:#fff; font-weight:700; cursor:pointer;}
+        .btn{padding:10px 12px; border-radius:12px; border:1px solid var(--purple); background:var(--purple); color:#fff; font-weight:700; cursor:pointer;}
         .btn.ghost{background:#fff; color:var(--ink); border-color:var(--line)}
         .input, select, textarea{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff;}
         .label{display:block; font-size:13px; opacity:.85; margin-bottom:4px;}
         .row{display:flex; gap:12px; align-items:center;}
         .backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:grid; place-items:center; z-index:50; padding:20px;}
-        .sheet{width:100%; max-width:820px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px;}
+        .sheet{width:100%; max-width:980px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px;}
+        table{border-collapse:collapse;} th{text-align:left;}
       `}</style>
     </div>
   );
