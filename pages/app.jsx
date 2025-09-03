@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Keep it simple: client defined here
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
-
-const COLLAR_COLORS = [
-  "Black","Cream","Red","Apricot","Gold","Chocolate",
-  "Blue","Green","Purple","Pink","Orange","Yellow"
-];
 
 const fmtDate = (d) => new Date(d).toLocaleDateString();
 
@@ -26,11 +20,14 @@ export default function AppHome() {
   const [nameInput, setNameInput] = useState("");
   const [programInput, setProgramInput] = useState("");
 
-  // litters list
+  // litters
   const [litters, setLitters] = useState([]);
   const [openId, setOpenId] = useState("");
 
-  // create-litter panel
+  // color_map from Supabase
+  const [collarColors, setCollarColors] = useState([]);
+
+  // create panel
   const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
@@ -41,7 +38,7 @@ export default function AppHome() {
 
       const { data: prof } = await supabase
         .from("profiles")
-        .select("display_name, program_name, units")
+        .select("display_name, program_name")
         .eq("id", u.user.id)
         .maybeSingle();
 
@@ -57,8 +54,12 @@ export default function AppHome() {
         .select("id, litter_name, sire_name, dam_name, whelp_date")
         .eq("user_id", u.user.id)
         .order("whelp_date", { ascending: false });
-
       setLitters(lits || []);
+
+      // pull your color_map (label column) so dropdown matches Supabase
+      const { data: cmap } = await supabase.from("color_map").select("label").order("label");
+      setCollarColors(cmap?.map(r => r.label) || ["Black"]); // fallback
+
       setLoading(false);
     })();
   }, []);
@@ -77,7 +78,6 @@ export default function AppHome() {
   };
 
   if (loading) return <div className="card">Loading…</div>;
-
   const firstSignIn = !displayName || !programName;
 
   return (
@@ -110,51 +110,48 @@ export default function AppHome() {
         </div>
       )}
 
-      {/* Primary actions (no “Get Started”) */}
+      {/* Primary actions */}
       <div className="card">
         <div style={{ display:"grid", gridTemplateColumns:"auto 1fr auto", gap:12, alignItems:"center" }}>
           <button className="btn" onClick={() => setShowCreate(true)}>Add a litter</button>
 
           <select className="input" value={openId} onChange={(e)=>setOpenId(e.target.value)}>
-            <option value="">Choose existing litter…</option>
-            {litters.map((l) => (
-              <option key={l.id} value={l.id}>
-                {(l.litter_name || `${l.sire_name} x ${l.dam_name}`) + (l.whelp_date ? ` • ${fmtDate(l.whelp_date)}` : "")}
-              </option>
-            ))}
+            {litters.length === 0 ? (
+              <option value="">No litters yet</option>
+            ) : (
+              <>
+                <option value="">Choose existing litter…</option>
+                {litters.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {(l.litter_name || `${l.sire_name} x ${l.dam_name}`) +
+                      (l.whelp_date ? ` • ${fmtDate(l.whelp_date)}` : "")}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
 
-          <button
-            className="btn ghost"
-            onClick={() => {
-              if (!openId) return;
-              // Hook up once /litter/[id] exists:
-              // router.push(`/litter/${openId}`);
-              alert("Litter Home will open once that route is added.");
-            }}
-          >
+          <button className="btn ghost" disabled={!openId}
+            onClick={() => { if (!openId) return; alert("Litter Home will open once that route is added."); }}>
             Open
           </button>
         </div>
       </div>
 
-      {/* Create Litter panel */}
       {showCreate && (
         <CreateLitterPanel
           onClose={() => setShowCreate(false)}
-          onCreated={(lit) => {
-            setLitters((p) => [lit, ...p]);
-            setShowCreate(false);
-          }}
+          onCreated={(lit) => { setLitters((p)=>[lit, ...p]); setShowCreate(false); }}
           userId={user?.id}
+          collarColors={collarColors}
         />
       )}
     </div>
   );
 }
 
-/* ---------- Create Litter (with Collar color + unit picker; no Deceased) ---------- */
-function CreateLitterPanel({ onClose, onCreated, userId }) {
+/* ---------- Create Litter (Collar color from Supabase; unit picker; no Deceased) ---------- */
+function CreateLitterPanel({ onClose, onCreated, userId, collarColors }) {
   const [sire, setSire] = useState("");
   const [dam, setDam] = useState("");
   const [name, setName] = useState("");
@@ -166,8 +163,14 @@ function CreateLitterPanel({ onClose, onCreated, userId }) {
   const [unit, setUnit] = useState("grams"); // grams | ounces | kilograms | lb-oz
 
   // rows
-  const blank = { name:"", sex:"", collar:"Black", bw:"", lb:"", oz:"" };
+  const blank = { name:"", sex:"", collar: (collarColors[0] || "Black"), bw:"", lb:"", oz:"" };
   const [rows, setRows] = useState([ { ...blank } ]);
+
+  useEffect(() => {
+    // if colors arrive after open, reset default for the first row
+    setRows((r)=> r.length ? r : [{ ...blank }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collarColors]);
 
   const addRow = () => setRows((r) => [...r, { ...blank }]);
   const updateRow = (i, k, v) => setRows((r) => r.map((row, idx) => (idx===i ? { ...row, [k]: v } : row)));
@@ -212,9 +215,9 @@ function CreateLitterPanel({ onClose, onCreated, userId }) {
           litter_id: litter.id,
           name: r.name.trim(),
           sex: r.sex || null,
-          color: r.collar || "Black", // stored as color, labeled as Collar color
+          color: r.collar || "Black", // stored as color; UI label is "Collar color"
           birth_weight_grams: rowToGrams(r),
-          status: "Active", // no deceased on create
+          status: "Active",
         }));
       if (pups.length){
         const { error: pErr } = await supabase.from("puppies").insert(pups);
@@ -270,12 +273,12 @@ function CreateLitterPanel({ onClose, onCreated, userId }) {
 
             {/* Table with horizontal scroll so nothing overlaps */}
             <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", minWidth:760, borderCollapse:"collapse" }}>
+              <table style={{ width:"100%", minWidth:820 }}>
                 <thead>
                   <tr>
                     <TH style={{ width:36 }} />
                     <TH>Name *</TH>
-                    <TH>Sex (opt)</TH>
+                    <TH>Sex</TH>
                     <TH>Collar color</TH>
                     <TH>Birth weight ({unit === "lb-oz" ? "lb + oz" : unit})</TH>
                   </tr>
@@ -298,7 +301,9 @@ function CreateLitterPanel({ onClose, onCreated, userId }) {
                       </TD>
                       <TD>
                         <select className="input" value={r.collar} onChange={(e)=>updateRow(i,"collar",e.target.value)}>
-                          {COLLAR_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                          {(collarColors.length ? collarColors : ["Black"]).map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
                         </select>
                       </TD>
                       <TD>
@@ -338,12 +343,8 @@ function CreateLitterPanel({ onClose, onCreated, userId }) {
 }
 
 /* small helpers for table cells */
-function TH({ children, style }) {
-  return <th style={{ textAlign:"left", padding:"8px 6px", ...style }}>{children}</th>;
-}
-function TD({ children, style }) {
-  return <td style={{ padding:"8px 6px", verticalAlign:"middle", ...style }}>{children}</td>;
-}
+function TH({ children, style }) { return <th style={{ padding:"8px 6px", ...style }}>{children}</th>; }
+function TD({ children, style }) { return <td style={{ padding:"8px 6px", verticalAlign:"middle", ...style }}>{children}</td>; }
 function Field({ label, type="text", value, onChange }) {
   return (
     <div>
