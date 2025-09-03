@@ -2,7 +2,7 @@
 import "../styles/globals.css";
 import Head from "next/head";
 
-// Supabase public logo URL
+// Your Supabase logo URL
 const LOGO_URL =
   "https://mybbpohhluctmqvfsdfz.supabase.co/storage/v1/object/public/logo/companion%20dog%20project%20(2).svg";
 
@@ -18,11 +18,11 @@ export default function MyApp({ Component, pageProps }) {
         />
       </Head>
 
-      {/* WIDE SAGE HEADER */}
+      {/* Wide sage band + large logo */}
       <header className="site-header">
         <div className="logo-box">
-          {/* removed fallback text so nothing shows under the logo */}
-          <img src={LOGO_URL} alt="Companion Dog Project logo" />
+          {/* alt is empty so no text ever shows; also hide any stray children */}
+          <img src={LOGO_URL} alt="" />
         </div>
 
         <h1 className="site-title">
@@ -34,7 +34,6 @@ export default function MyApp({ Component, pageProps }) {
         <div className="spacer" />
       </header>
 
-      {/* Page content */}
       <main className="site-main">
         <Component {...pageProps} />
       </main>
@@ -57,17 +56,18 @@ export default function MyApp({ Component, pageProps }) {
                        Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
         }
 
-        /* Wide sage band + large logo */
+        /* WIDE SAGE HEADER */
         .site-header {
           display: flex;
           align-items: center;
           gap: 20px;
-          padding: 24px 24px;
+          padding: 24px;
           background: var(--sage);
           color: var(--ink);
           min-height: 140px;
         }
         .logo-box {
+          position: relative;
           width: 140px;
           height: 140px;
           border-radius: 18px;
@@ -78,5 +78,70 @@ export default function MyApp({ Component, pageProps }) {
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
           border: 1px solid rgba(0,0,0,0.06);
           flex: 0 0 auto;
+          /* if anything except the image slips in, hide it */
+          font-size: 0; line-height: 0;
         }
-        .logo-box img { width: 100%; height: 100%
+        .logo-box img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+        .logo-box :not(img) { display: none !important; }  /* nuke any fallback text */
+
+        .site-title { margin: 0; font-size: 28px; font-weight: 800; line-height: 1.2; }
+        .cdp { color: var(--ink); }
+        .app { color: var(--purple); }
+        .spacer { flex: 1; }
+
+        .site-main {
+          max-width: 980px;
+          width: 100%;
+          margin: 24px auto;
+          padding: 0 20px;
+        }
+
+        /* FORCE ALL BUTTONS PURPLE */
+        button,
+        .btn,
+        .btn.primary,
+        .btn.ghost,
+        .iconBtn,
+        input[type="button"],
+        input[type="submit"],
+        input[type="reset"] {
+          background: var(--purple) !important;
+          border: 1px solid var(--purple) !important;
+          color: #fff !important;
+          border-radius: 12px;
+          padding: 10px 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        button:disabled,
+        .btn:disabled,
+        input:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        /* Inputs */
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+        .label { display:block; font-size:13px; opacity:.85; margin-bottom:4px; }
+        .input, select, textarea {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid var(--line);
+          border-radius: 10px;
+          background: #fff;
+        }
+
+        @media (max-width: 640px) {
+          .site-header { flex-direction: column; align-items: flex-start; gap: 14px; min-height: unset; }
+          .logo-box { width: 120px; height: 120px; }
+          .site-title { font-size: 24px; }
+        }
+      `}</style>
+    </>
+  );
+}
