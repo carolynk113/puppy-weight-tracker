@@ -4,11 +4,10 @@ import { supabase } from '../lib/supabaseClient';
 
 const COLORS = {
   sage: '#8FAE8F',
-  lemon: '#F2E35D',
   purple: '#6F5AA8',
-  ink: '#1e1e1e',
   line: '#e6e6e6',
   bg: '#f8f9f8',
+  ink: '#1e1e1e',
 };
 
 export default function Home() {
@@ -18,7 +17,6 @@ export default function Home() {
   const [userEmail, setUserEmail] = useState('');
   const envMissing = !supabase;
 
-  // Read session & react to auth changes
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -58,29 +56,39 @@ export default function Home() {
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '14px 18px',
-          borderBottom: `1px solid ${COLORS.line}`,
-          background: COLORS.sage,
-        }}
-      >
-        <img
-          src="https://mybbpohhluctmqvfsdfz.supabase.co/storage/v1/object/public/logo/companion%20dog%20project%20(2).svg"
-          alt="Companion Dog Project logo"
-          width={28}
-          height={28}
-          style={{ borderRadius: 6, background: '#ffffffa8', padding: 2 }}
-        />
-        <span style={{ fontWeight: 650 }}>Puppy Weight Tracker</span>
+      <div style={{ background: COLORS.sage, borderBottom: `1px solid ${COLORS.line}` }}>
+        <div
+          style={{
+            maxWidth: 980,
+            margin: '0 auto',
+            padding: '14px 18px',
+            display: 'flex',
+            gap: 18,
+            alignItems: 'center',
+          }}
+        >
+          <img
+            src="https://mybbpohhluctmqvfsdfz.supabase.co/storage/v1/object/public/logo/companion%20dog%20project%20(2).svg"
+            alt="Companion Dog Project logo"
+            width={140}
+            height={140}
+            style={{ borderRadius: 16, background: '#ffffffa8', padding: 6, flex: '0 0 auto' }}
+          />
+          <div>
+            {/* BIG project name */}
+            <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1.1 }}>
+              Companion Dog Project
+            </div>
+            {/* Keep Puppy Weight Tracker large (not smaller than before) */}
+            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 6 }}>
+              Puppy Weight Tracker
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Content */}
       <div style={{ maxWidth: 520, margin: '32px auto', padding: '0 16px' }}>
-        {/* Warning if env not set (renders but disables auth) */}
         {envMissing && (
           <div
             style={{
@@ -91,8 +99,8 @@ export default function Home() {
               marginBottom: 16,
             }}
           >
-            Supabase keys aren’t available here. The page loads, but sign-in won’t
-            work until environment variables are set.
+            Supabase keys aren’t available here. The page loads, but sign-in won’t work until
+            environment variables are set.
           </div>
         )}
 
@@ -151,7 +159,7 @@ export default function Home() {
                 <div
                   style={{
                     marginTop: 4,
-                    background: COLORS.lemon,
+                    background: '#efe9ff',
                     border: `1px solid ${COLORS.line}`,
                     padding: 10,
                     borderRadius: 10,
@@ -183,7 +191,7 @@ export default function Home() {
                 href="/app"
                 style={{
                   textDecoration: 'none',
-                  background: COLORS.lemon,
+                  background: '#F2E35D',
                   border: `1px solid ${COLORS.line}`,
                   color: COLORS.ink,
                   padding: '10px 14px',
@@ -209,20 +217,6 @@ export default function Home() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Footer (subtle) */}
-      <div style={{ textAlign: 'center', padding: '16px 12px', color: '#666', fontSize: 13 }}>
-        <span>Brand colors: </span>
-        <span style={{ background: COLORS.sage, padding: '2px 8px', borderRadius: 999, marginRight: 6 }}>
-          sage
-        </span>
-        <span style={{ background: COLORS.lemon, padding: '2px 8px', borderRadius: 999, marginRight: 6 }}>
-          lemon
-        </span>
-        <span style={{ background: COLORS.purple, padding: '2px 8px', borderRadius: 999 }}>
-          purple
-        </span>
       </div>
     </div>
   );
