@@ -1,12 +1,37 @@
 // /pages/_app.js
 import "../styles/globals.css";
 import Head from "next/head";
+import { useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+// Supabase client for magic-link session exchange
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 // Your Supabase logo URL
 const LOGO_URL =
   "https://mybbpohhluctmqvfsdfz.supabase.co/storage/v1/object/public/logo/companion%20dog%20project%20(2).svg";
 
 export default function MyApp({ Component, pageProps }) {
+  // Exchange ?code= from the magic link for a session (no UI changes)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const errorDesc = url.searchParams.get("error_description");
+    if (errorDesc) alert(decodeURIComponent(errorDesc));
+    if (!code) return;
+
+    (async () => {
+      const { error } = await supabase.auth.exchangeCodeForSession({ code });
+      if (error) { alert(error.message); return; }
+      // Clean up the URL and land on /app
+      window.history.replaceState({}, "", "/app");
+    })();
+  }, []);
+
   return (
     <>
       <Head>
@@ -101,7 +126,7 @@ export default function MyApp({ Component, pageProps }) {
           padding: 0 20px;
         }
 
-        /* FORCE ALL BUTTONS PURPLE */
+        /* FORCE ALL BUTTONS PURPLE (unchanged from your file) */
         button,
         .btn,
         .btn.primary,
