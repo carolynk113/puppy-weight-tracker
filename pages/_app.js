@@ -4,7 +4,7 @@ import Head from "next/head";
 import { useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Supabase client (for magic-link session)
+// Supabase client for session handling
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -15,43 +15,52 @@ const LOGO_URL =
   "https://mybbpohhluctmqvfsdfz.supabase.co/storage/v1/object/public/logo/companion%20dog%20project%20(2).svg";
 
 export default function MyApp({ Component, pageProps }) {
-  // Handle BOTH magic-link styles:
-  // 1) modern: ?code=...  -> exchangeCodeForSession
-  // 2) legacy: #access_token=...&refresh_token=... -> setSession
+  // A) Turn magic-link params into a session (supports new and legacy flows)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
 
-    const maybeFinishAuth = async () => {
-      // A) New flow (?code=)
+    const run = async () => {
+      // New flow: ?code=...
       const code = url.searchParams.get("code");
-      const errorDesc = url.searchParams.get("error_description");
-      if (errorDesc) alert(decodeURIComponent(errorDesc));
+      const err = url.searchParams.get("error_description");
+      if (err) alert(decodeURIComponent(err));
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession({ code });
-        if (error) { alert(error.message); return; }
-        // Clean URL and land on /app
-        window.history.replaceState({}, "", "/app");
-        return;
+        if (!error) {
+          window.history.replaceState({}, "", "/app"); // stay on /app
+          return;
+        }
+        alert(error.message);
       }
 
-      // B) Old flow (#access_token & #refresh_token in hash)
-      if (window.location.hash && window.location.hash.includes("access_token")) {
-        const params = new URLSearchParams(window.location.hash.slice(1)); // drop leading '#'
-        const access_token = params.get("access_token");
-        const refresh_token = params.get("refresh_token");
-        const error_description = params.get("error_description");
-        if (error_description) alert(decodeURIComponent(error_description));
-        if (access_token && refresh_token) {
-          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-          if (error) { alert(error.message); return; }
-          // Clean URL and land on /app
-          window.history.replaceState({}, "", "/app");
+      // Legacy flow: #access_token&refresh_token
+      if (window.location.hash.includes("access_token")) {
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        const at = params.get("access_token");
+        const rt = params.get("refresh_token");
+        const e2 = params.get("error_description");
+        if (e2) alert(decodeURIComponent(e2));
+        if (at && rt) {
+          const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+          if (!error) {
+            window.history.replaceState({}, "", "/app");
+            return;
+          }
+          alert(error.message);
         }
       }
     };
+    run();
+  }, []);
 
-    maybeFinishAuth();
+  // B) If already logged in and stuck on "/", nudge to /app
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.pathname !== "/") return;
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) window.location.replace("/app");
+    });
   }, []);
 
   return (
@@ -65,7 +74,7 @@ export default function MyApp({ Component, pageProps }) {
         />
       </Head>
 
-      {/* Wide sage band + large logo */}
+      {/* WIDE SAGE HEADER */}
       <header className="site-header">
         <div className="logo-box">
           {/* alt is empty so no text ever shows; also hide any stray children */}
@@ -148,7 +157,7 @@ export default function MyApp({ Component, pageProps }) {
           padding: 0 20px;
         }
 
-        /* FORCE ALL BUTTONS PURPLE (kept exactly as your version) */
+        /* FORCE ALL BUTTONS PURPLE (unchanged) */
         button,
         .btn,
         .btn.primary,
@@ -192,3 +201,4 @@ export default function MyApp({ Component, pageProps }) {
     </>
   );
 }
+
