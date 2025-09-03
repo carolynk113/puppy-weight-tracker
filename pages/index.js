@@ -1,3 +1,4 @@
+// /pages/index.js
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -9,11 +10,20 @@ const supabase = createClient(
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const send = async () => {
+    setErrorMsg("");
     const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL}/app`;
-    const { error } = await supabase.auth.signInWithOtp({ email }, { emailRedirectTo: redirectTo });
-    if (error) alert(error.message); else setSent(true);
+
+    // IMPORTANT: supabase-js v2 uses the options object
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo },
+    });
+
+    if (error) setErrorMsg(error.message);
+    else setSent(true);
   };
 
   return (
@@ -24,9 +34,17 @@ export default function SignIn() {
       ) : (
         <>
           <label className="label">Email</label>
-          <input className="input" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" />
+          <input
+            className="input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+          />
+          {errorMsg ? (
+            <div style={{ color: "#b00020", marginTop: 8 }}>{errorMsg}</div>
+          ) : null}
           <div style={{ marginTop: 12 }}>
-            <button className="btn" onClick={send} disabled={!email}>Send magic link</button>
+            <button onClick={send} disabled={!email}>Send magic link</button>
           </div>
         </>
       )}
