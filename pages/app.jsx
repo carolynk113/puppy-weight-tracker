@@ -1,3 +1,4 @@
+// /pages/app.jsx
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -6,28 +7,26 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-const fmtDate = (d) => new Date(d).toLocaleDateString();
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "");
 
 export default function AppHome() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
-  // profile
+  // Profile
   const [displayName, setDisplayName] = useState("");
   const [programName, setProgramName] = useState("");
-
-  // onboarding inputs (first sign-in only)
   const [nameInput, setNameInput] = useState("");
   const [programInput, setProgramInput] = useState("");
 
-  // litters
+  // Litters
   const [litters, setLitters] = useState([]);
   const [openId, setOpenId] = useState("");
 
-  // color_map from Supabase
-  const [collarColors, setCollarColors] = useState([]);
+  // Colors for collar dropdown
+  const [collarColors, setCollarColors] = useState(["Black"]);
 
-  // create panel
+  // Create panel
   const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
@@ -36,6 +35,7 @@ export default function AppHome() {
       if (!u?.user) { setLoading(false); return; }
       setUser(u.user);
 
+      // Load profile
       const { data: prof } = await supabase
         .from("profiles")
         .select("display_name, program_name")
@@ -49,16 +49,21 @@ export default function AppHome() {
         setProgramInput(prof.program_name || "");
       }
 
-      const { data: lits } = await supabase
+      // Load litters (do not filter on owner_id here; RLS enforces it)
+      const { data: lits, error: litErr } = await supabase
         .from("litters")
-        .select("id, litter_name, sire_name, dam_name, whelp_date")
-        .eq("user_id", u.user.id)
+        .select("id, name, litter_name, sire_name, dam_name, whelp_date")
         .order("whelp_date", { ascending: false });
-      setLitters(lits || []);
 
-      // pull your color_map (label column) so dropdown matches Supabase
-      const { data: cmap } = await supabase.from("color_map").select("label").order("label");
-      setCollarColors(cmap?.map(r => r.label) || ["Black"]); // fallback
+      if (!litErr) setLitters(lits || []);
+
+      // Load color_map (label column)
+      const { data: cmap } = await supabase
+        .from("color_map")
+        .select("label")
+        .order("label", { ascending: true });
+
+      if (cmap?.length) setCollarColors(cmap.map((r) => r.label));
 
       setLoading(false);
     })();
@@ -78,6 +83,7 @@ export default function AppHome() {
   };
 
   if (loading) return <div className="card">Loading…</div>;
+
   const firstSignIn = !displayName || !programName;
 
   return (
@@ -103,17 +109,17 @@ export default function AppHome() {
             </div>
           </div>
           <div style={{ marginTop:12 }}>
-            <button className="btn" onClick={saveBasics} disabled={!nameInput.trim() || !programInput.trim()}>
+            <button onClick={saveBasics} disabled={!nameInput.trim() || !programInput.trim()}>
               Save
             </button>
           </div>
         </div>
       )}
 
-      {/* Primary actions */}
+      {/* Primary actions: Add Litter + Choose Existing */}
       <div className="card">
         <div style={{ display:"grid", gridTemplateColumns:"auto 1fr auto", gap:12, alignItems:"center" }}>
-          <button className="btn" onClick={() => setShowCreate(true)}>Add a litter</button>
+          <button onClick={() => setShowCreate(true)}>Add a litter</button>
 
           <select className="input" value={openId} onChange={(e)=>setOpenId(e.target.value)}>
             {litters.length === 0 ? (
@@ -123,7 +129,7 @@ export default function AppHome() {
                 <option value="">Choose existing litter…</option>
                 {litters.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {(l.litter_name || `${l.sire_name} x ${l.dam_name}`) +
+                    {(l.name || l.litter_name || `${l.sire_name} x ${l.dam_name}`) +
                       (l.whelp_date ? ` • ${fmtDate(l.whelp_date)}` : "")}
                   </option>
                 ))}
@@ -131,8 +137,16 @@ export default function AppHome() {
             )}
           </select>
 
-          <button className="btn ghost" disabled={!openId}
-            onClick={() => { if (!openId) return; alert("Litter Home will open once that route is added."); }}>
+          <button
+            className="btn ghost"
+            disabled={!openId}
+            onClick={() => {
+              if (!openId) return;
+              // If you have a Litter Home route, navigate there:
+              // window.location.href = `/litter/${openId}`;
+              alert("Open Litter: route not wired yet.");
+            }}
+          >
             Open
           </button>
         </div>
@@ -141,8 +155,7 @@ export default function AppHome() {
       {showCreate && (
         <CreateLitterPanel
           onClose={() => setShowCreate(false)}
-          onCreated={(lit) => { setLitters((p)=>[lit, ...p]); setShowCreate(false); }}
-          userId={user?.id}
+          onCreated={(lit) => { setLitters((prev)=>[lit, ...prev]); setShowCreate(false); }}
           collarColors={collarColors}
         />
       )}
@@ -150,11 +163,12 @@ export default function AppHome() {
   );
 }
 
-/* ---------- Create Litter (Collar color from Supabase; unit picker; no Deceased) ---------- */
-function CreateLitterPanel({ onClose, onCreated, userId, collarColors }) {
+/* ---------------- Create Litter (fits your schema exactly) ---------------- */
+
+function CreateLitterPanel({ onClose, onCreated, collarColors }) {
   const [sire, setSire] = useState("");
   const [dam, setDam] = useState("");
-  const [name, setName] = useState("");
+  const [litterName, setLitterName] = useState(""); // optional
   const [date, setDate] = useState("");
   const [notes, setNotes] = useState("");
   const [addNow, setAddNow] = useState(false);
@@ -162,15 +176,9 @@ function CreateLitterPanel({ onClose, onCreated, userId, collarColors }) {
   // unit for birth weights
   const [unit, setUnit] = useState("grams"); // grams | ounces | kilograms | lb-oz
 
-  // rows
-  const blank = { name:"", sex:"", collar: (collarColors[0] || "Black"), bw:"", lb:"", oz:"" };
-  const [rows, setRows] = useState([ { ...blank } ]);
-
-  useEffect(() => {
-    // if colors arrive after open, reset default for the first row
-    setRows((r)=> r.length ? r : [{ ...blank }]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collarColors]);
+  // row template
+  const blank = { name:"", sex:"", collar:(collarColors[0] || "Black"), bw:"", lb:"", oz:"" };
+  const [rows, setRows] = useState([{ ...blank }]);
 
   const addRow = () => setRows((r) => [...r, { ...blank }]);
   const updateRow = (i, k, v) => setRows((r) => r.map((row, idx) => (idx===i ? { ...row, [k]: v } : row)));
@@ -191,37 +199,42 @@ function CreateLitterPanel({ onClose, onCreated, userId, collarColors }) {
   };
 
   const save = async () => {
-    const litter_name = name.trim() || `${sire.trim()} x ${dam.trim()}`;
+    // Build a safe "name" (required), and pass litter_name (optional)
+    const safeName =
+      (litterName && litterName.trim()) ||
+      (sire.trim() || dam.trim() ? `${sire.trim()} x ${dam.trim()}` : "Unnamed Litter");
 
     const { data: litter, error } = await supabase
       .from("litters")
       .insert({
-        user_id: userId,
+        // DO NOT send owner_id — DB should fill it
+        name: safeName,                 // required by your schema
+        litter_name: litterName || null,
         sire_name: sire.trim(),
         dam_name: dam.trim(),
-        litter_name,
         whelp_date: date,
         notes: notes || null,
       })
-      .select("id, litter_name, sire_name, dam_name, whelp_date")
+      .select("id, name, litter_name, sire_name, dam_name, whelp_date")
       .single();
 
     if (error) { alert(error.message); return; }
 
     if (addNow) {
       const pups = rows
-        .filter(r => r.name.trim())
-        .map(r => ({
+        .filter((r) => r.name.trim())
+        .map((r) => ({
           litter_id: litter.id,
           name: r.name.trim(),
           sex: r.sex || null,
-          color: r.collar || "Black", // stored as color; UI label is "Collar color"
-          birth_weight_grams: rowToGrams(r),
+          color_label: r.collar || "Black",                 // <-- matches your schema
+          birth_weight_grams: rowToGrams(r),                // <-- matches your schema
           status: "Active",
         }));
-      if (pups.length){
+
+      if (pups.length) {
         const { error: pErr } = await supabase.from("puppies").insert(pups);
-        if (pErr) alert(`Puppies not saved: ${pErr.message}`);
+        if (pErr) { alert(`Puppies not saved: ${pErr.message}`); }
       }
     }
 
@@ -240,7 +253,7 @@ function CreateLitterPanel({ onClose, onCreated, userId, collarColors }) {
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:8 }}>
           <Field label="Sire name *"  value={sire} onChange={setSire} />
           <Field label="Dam name *"   value={dam} onChange={setDam} />
-          <Field label="Litter name (optional)" value={name} onChange={setName} />
+          <Field label="Litter name (optional)" value={litterName} onChange={setLitterName} />
           <Field label="Whelp date *" type="date" value={date} onChange={setDate} />
         </div>
 
@@ -273,7 +286,7 @@ function CreateLitterPanel({ onClose, onCreated, userId, collarColors }) {
 
             {/* Table with horizontal scroll so nothing overlaps */}
             <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", minWidth:820 }}>
+              <table style={{ width:"100%", minWidth:860 }}>
                 <thead>
                   <tr>
                     <TH style={{ width:36 }} />
@@ -301,7 +314,7 @@ function CreateLitterPanel({ onClose, onCreated, userId, collarColors }) {
                       </TD>
                       <TD>
                         <select className="input" value={r.collar} onChange={(e)=>updateRow(i,"collar",e.target.value)}>
-                          {(collarColors.length ? collarColors : ["Black"]).map(c => (
+                          {(collarColors.length ? collarColors : ["Black"]).map((c) => (
                             <option key={c} value={c}>{c}</option>
                           ))}
                         </select>
@@ -353,3 +366,4 @@ function Field({ label, type="text", value, onChange }) {
     </div>
   );
 }
+
